@@ -6,6 +6,7 @@ import {useState} from "react";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Conversation} from "@11labs/client";
 import {cn} from "@/lib/utils";
+import {agents, AgentConfig} from "@/config/agents";
 
 async function requestMicrophonePermission() {
     try {
@@ -17,8 +18,8 @@ async function requestMicrophonePermission() {
     }
 }
 
-async function getSignedUrl(): Promise<string> {
-    const response = await fetch('/api/signed-url')
+async function getSignedUrl(agentId: string): Promise<string> {
+    const response = await fetch(`/api/signed-url?agentId=${agentId}`)
     if (!response.ok) {
         throw Error('Failed to get signed url')
     }
@@ -26,11 +27,11 @@ async function getSignedUrl(): Promise<string> {
     return data.signedUrl
 }
 
-export function ConvAI() {
+export function ConvAI({ preselectedAgent }: { preselectedAgent?: AgentConfig }) {
     const [conversation, setConversation] = useState<Conversation | null>(null)
     const [isConnected, setIsConnected] = useState(false)
     const [isSpeaking, setIsSpeaking] = useState(false)
-    const [avatarImage, setAvatarImage] = useState<string>("/Mr-Beast.png")
+    const [selectedAgent, setSelectedAgent] = useState<AgentConfig>(preselectedAgent || agents[0])
 
     async function startConversation() {
         const hasPermission = await requestMicrophonePermission()
@@ -38,7 +39,7 @@ export function ConvAI() {
             alert("No permission")
             return;
         }
-        const signedUrl = await getSignedUrl()
+        const signedUrl = await getSignedUrl(selectedAgent.id)
         const conversation = await Conversation.startSession({
             signedUrl: signedUrl,
             onConnect: () => {
@@ -82,20 +83,44 @@ export function ConvAI() {
                         </CardTitle>
                     </CardHeader>
                     <div className={'flex flex-col gap-y-4 text-center'}>
-                        <div className="relative">
-                            <img 
-                                src={avatarImage} 
-                                alt="AI Avatar"
-                                className={cn('w-32 h-32 rounded-full mx-auto my-16',
-                                    isSpeaking ? 'animate-pulse' : '',
-                                    isConnected ? 'border-4 border-green-500' : 'border-4 border-gray-300'
-                                )}
-                            />
-                            {/* <div className={cn('orb absolute top-0 left-1/2 -translate-x-1/2',
-                                isSpeaking ? 'animate-orb' : (conversation && 'animate-orb-slow'),
-                                isConnected ? 'orb-active' : 'orb-inactive')}
-                            ></div> */}
-                        </div>
+                        {!preselectedAgent && (
+                            <div className="grid grid-cols-5 gap-4 mb-8">
+                                {agents.map((agent) => (
+                                    <a
+                                        key={agent.id}
+                                        href={`/chat/${agent.name.toLowerCase().replace(/ /g, '-')}`}
+                                        className={cn(
+                                            'cursor-pointer p-2 rounded-lg transition-all no-underline',
+                                            'hover:bg-primary/5'
+                                        )}
+                                    >
+                                        <img 
+                                            src={agent.avatar} 
+                                            alt={agent.name}
+                                            className={cn('w-20 h-20 rounded-full mx-auto mb-2',
+                                                'border-4 border-gray-300'
+                                            )}
+                                        />
+                                        <p className="text-sm text-center font-medium">{agent.name}</p>
+                                        <p className="text-xs text-center text-muted-foreground">{agent.description}</p>
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+                        {preselectedAgent && (
+                            <div className="mb-8">
+                                <img 
+                                    src={selectedAgent.avatar} 
+                                    alt={selectedAgent.name}
+                                    className={cn('w-32 h-32 rounded-full mx-auto mb-4',
+                                        isSpeaking ? 'animate-pulse' : '',
+                                        isConnected ? 'border-4 border-green-500' : 'border-4 border-gray-300'
+                                    )}
+                                />
+                                <p className="text-xl text-center font-medium">{selectedAgent.name}</p>
+                                <p className="text-sm text-center text-muted-foreground mt-2">{selectedAgent.description}</p>
+                            </div>
+                        )}
 
                         <Button
                             variant={'outline'}
