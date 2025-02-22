@@ -1,7 +1,6 @@
 import type {Metadata} from "next";
 import "./globals.css";
 import {BackgroundWave} from "@/components/background-wave";
-import Link from "next/link";
 
 export const metadata: Metadata = {
     title: "Mentor.AI",

@@ -7,6 +7,7 @@ import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
 import {Conversation} from "@11labs/client";
 import {cn} from "@/lib/utils";
 import {agents, AgentConfig} from "@/config/agents";
+import Image from "next/image";
 
 async function requestMicrophonePermission() {
     try {
@@ -31,7 +32,7 @@ export function ConvAI({ preselectedAgent }: { preselectedAgent?: AgentConfig })
     const [conversation, setConversation] = useState<Conversation | null>(null)
     const [isConnected, setIsConnected] = useState(false)
     const [isSpeaking, setIsSpeaking] = useState(false)
-    const [selectedAgent, setSelectedAgent] = useState<AgentConfig>(preselectedAgent || agents[0])
+    const selectedAgent = preselectedAgent || agents[0]
 
     async function startConversation() {
         const hasPermission = await requestMicrophonePermission()
@@ -94,10 +95,12 @@ export function ConvAI({ preselectedAgent }: { preselectedAgent?: AgentConfig })
                                             'hover:bg-primary/5'
                                         )}
                                     >
-                                        <img 
+                                        <Image 
                                             src={agent.avatar} 
                                             alt={agent.name}
-                                            className={cn('w-20 h-20 rounded-full mx-auto mb-2',
+                                            width={80}
+                                            height={80}
+                                            className={cn('w-20 h-20 rounded-full mx-auto mb-2 object-cover',
                                                 'border-4 border-gray-300'
                                             )}
                                         />
@@ -109,10 +112,12 @@ export function ConvAI({ preselectedAgent }: { preselectedAgent?: AgentConfig })
                         )}
                         {preselectedAgent && (
                             <div className="mb-8">
-                                <img 
+                                <Image 
                                     src={selectedAgent.avatar} 
                                     alt={selectedAgent.name}
-                                    className={cn('w-32 h-32 rounded-full mx-auto mb-4',
+                                    width={128}
+                                    height={128}
+                                    className={cn('w-32 h-32 rounded-full mx-auto mb-4 object-cover',
                                         isSpeaking ? 'animate-pulse' : '',
                                         isConnected ? 'border-4 border-green-500' : 'border-4 border-gray-300'
                                     )}

@@ -1,5 +1,6 @@
 import {agents} from "@/config/agents";
 import {cn} from "@/lib/utils";
+import Image from "next/image";
 
 export default function Home() {
     return (
@@ -17,10 +18,12 @@ export default function Home() {
                                 'flex flex-col items-center'
                             )}
                         >
-                            <img 
+                            <Image 
                                 src={agent.avatar} 
                                 alt={agent.name}
-                                className="w-32 h-32 rounded-full mb-4 border-4 border-gray-300"
+                                width={100}
+                                height={100}
+                                className="w-[100px] h-[100px] rounded-full mb-4 border-4 border-gray-300 object-cover"
                             />
                             <h2 className="text-xl font-medium text-center mb-2">{agent.name}</h2>
                             <p className="text-sm text-center text-muted-foreground">{agent.description}</p>
