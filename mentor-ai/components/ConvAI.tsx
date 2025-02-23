@@ -19,19 +19,19 @@ type TranscriptEntry = {
     agent_id?: string;
 };
 
-type ConversationData = {
-    timestamp: string;
-    conversation_id: string;
-    user_id: string;
-    messages: string;
-    agents_involved: string;
-    metadata: string;
-};
+// type ConversationData = {
+//     timestamp: string;
+//     conversation_id: string;
+//     user_id: string;
+//     messages: string;
+//     agents_involved: string;
+//     metadata: string;
+// };
 export function ConvAI({ preselectedAgent }: { preselectedAgent?: AgentConfig }) {
     const [conversation, setConversation] = useState<Conversation | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
-    const [avatarImage, setAvatarImage] = useState<string>("/Mr-Beast.png");
+    // const [avatarImage, setAvatarImage] = useState<string>("/Mr-Beast.png");
     const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
     const [conversationId, setConversationId] = useState<string>("");
     const [userId, setUserId] = useState<string>("");
