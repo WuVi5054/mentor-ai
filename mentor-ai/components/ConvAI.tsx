@@ -2,10 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import * as React from "react";
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Conversation } from "@11labs/client";
-import { cn } from "@/lib/utils";
+
+import {useState, useEffect} from "react";
+import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
+import {Conversation} from "@11labs/client";
+import {cn} from "@/lib/utils";
+import {agents, AgentConfig} from "@/config/agents";
+import Image from "next/image";
+
 
 // Enhanced transcript entry type
 type TranscriptEntry = {
@@ -23,8 +27,7 @@ type ConversationData = {
     agents_involved: string;
     metadata: string;
 };
-
-export function ConvAI() {
+export function ConvAI({ preselectedAgent }: { preselectedAgent?: AgentConfig }) {
     const [conversation, setConversation] = useState<Conversation | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
@@ -32,7 +35,8 @@ export function ConvAI() {
     const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
     const [conversationId, setConversationId] = useState<string>("");
     const [userId, setUserId] = useState<string>("");
-
+    const selectedAgent = preselectedAgent || agents[0]
+    
     useEffect(() => {
         // Generate a unique conversation ID on component mount
         setConversationId(generateUniqueId());
@@ -97,6 +101,15 @@ export function ConvAI() {
         }
     };
 
+    async function getSignedUrl(agentId: string): Promise<string> {
+        const response = await fetch(`/api/signed-url?agentId=${agentId}`)
+        if (!response.ok) {
+            throw Error('Failed to get signed url')
+        }
+        const data = await response.json()
+        return data.signedUrl
+    }
+    
     const addToTranscript = (text: string, role: 'ai' | 'user') => {
         setTranscript(prevTranscript => [...prevTranscript, {
             text,
@@ -111,10 +124,8 @@ export function ConvAI() {
             alert("No permission");
             return;
         }
-        // Add initial greeting message
-        addToTranscript("Hi", "ai");
-        
-        const signedUrl = await getSignedUrl();
+
+        const signedUrl = await getSignedUrl(selectedAgent.id)
         const conversation = await Conversation.startSession({
             signedUrl: signedUrl,
             onConnect: () => {
@@ -167,17 +178,50 @@ export function ConvAI() {
                             )}
                         </CardTitle>
                     </CardHeader>
-                    <div className="flex flex-col gap-y-4 text-center">
-                        <div className="relative">
-                            <img 
-                                src={avatarImage} 
-                                alt="AI Avatar"
-                                className={cn('w-32 h-32 rounded-full mx-auto my-16',
-                                    isSpeaking ? 'animate-pulse' : '',
-                                    isConnected ? 'border-4 border-green-500' : 'border-4 border-gray-300'
-                                )}
-                            />
-                        </div>
+
+                    <div className={'flex flex-col gap-y-4 text-center'}>
+                        {!preselectedAgent && (
+                            <div className="grid grid-cols-5 gap-4 mb-8">
+                                {agents.map((agent) => (
+                                    <a
+                                        key={agent.id}
+                                        href={`/chat/${agent.name.toLowerCase().replace(/ /g, '-')}`}
+                                        className={cn(
+                                            'cursor-pointer p-2 rounded-lg transition-all no-underline',
+                                            'hover:bg-primary/5'
+                                        )}
+                                    >
+                                        <Image 
+                                            src={agent.avatar} 
+                                            alt={agent.name}
+                                            width={80}
+                                            height={80}
+                                            className={cn('w-20 h-20 rounded-full mx-auto mb-2 object-cover',
+                                                'border-4 border-gray-300'
+                                            )}
+                                        />
+                                        <p className="text-sm text-center font-medium">{agent.name}</p>
+                                        <p className="text-xs text-center text-muted-foreground">{agent.description}</p>
+                                    </a>
+                                ))}
+                            </div>
+                        )}
+                        {preselectedAgent && (
+                            <div className="mb-8">
+                                <Image 
+                                    src={selectedAgent.avatar} 
+                                    alt={selectedAgent.name}
+                                    width={128}
+                                    height={128}
+                                    className={cn('w-32 h-32 rounded-full mx-auto mb-4 object-cover',
+                                        isSpeaking ? 'animate-pulse' : '',
+                                        isConnected ? 'border-4 border-green-500' : 'border-4 border-gray-300'
+                                    )}
+                                />
+                                <p className="text-xl text-center font-medium">{selectedAgent.name}</p>
+                                <p className="text-sm text-center text-muted-foreground mt-2">{selectedAgent.description}</p>
+                            </div>
+                        )}
 
                         <div className="flex gap-4 justify-center">
                             <Button
@@ -246,11 +290,11 @@ async function requestMicrophonePermission() {
     }
 }
 
-async function getSignedUrl(): Promise<string> {
-    const response = await fetch('/api/signed-url');
-    if (!response.ok) {
-        throw Error('Failed to get signed url');
-    }
-    const data = await response.json();
-    return data.signedUrl;
-}
+// async function getSignedUrl(): Promise<string> {
+//     const response = await fetch('/api/signed-url');
+//     if (!response.ok) {
+//         throw Error('Failed to get signed url');
+//     }
+//     const data = await response.json();
+//     return data.signedUrl;
+// }

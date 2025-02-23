@@ -1,10 +1,11 @@
 import {NextResponse} from "next/server";
 
-export async function GET() {
-    const agentId = process.env.AGENT_ID
+export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url)
+    const agentId = searchParams.get('agentId')
     const apiKey = process.env.XI_API_KEY
     if (!agentId) {
-        throw Error('AGENT_ID is not set')
+        return NextResponse.json({ error: 'Agent ID is required' }, { status: 400 })
     }
     if (!apiKey) {
         throw Error('XI_API_KEY is not set')
