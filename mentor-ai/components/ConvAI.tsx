@@ -18,7 +18,12 @@ type TranscriptEntry = {
     timestamp: Date;
     agent_id?: string;
 };
-
+type ActiveConversation = {
+    conversation: Conversation;
+    agentId: string;
+    isConnected: boolean;
+    isSpeaking: boolean;
+};
 // type ConversationData = {
 //     timestamp: string;
 //     conversation_id: string;
@@ -27,15 +32,14 @@ type TranscriptEntry = {
 //     agents_involved: string;
 //     metadata: string;
 // };
-export function ConvAI({ preselectedAgent }: { preselectedAgent?: AgentConfig }) {
-    const [conversation, setConversation] = useState<Conversation | null>(null);
-    const [isConnected, setIsConnected] = useState(false);
-    const [isSpeaking, setIsSpeaking] = useState(false);
-    // const [avatarImage, setAvatarImage] = useState<string>("/Mr-Beast.png");
+export function ConvAI({ preselectedAgents }: { preselectedAgents?: AgentConfig[] }) {
+    const [activeConversations, setActiveConversations] = useState<Record<string, ActiveConversation>>({});
     const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
     const [conversationId, setConversationId] = useState<string>("");
     const [userId, setUserId] = useState<string>("");
-    const selectedAgent = preselectedAgent || agents[0]
+    const selectedAgents = preselectedAgents || [agents[0], agents[1]];
+
+    
     
     useEffect(() => {
         // Generate a unique conversation ID on component mount
@@ -110,58 +114,88 @@ export function ConvAI({ preselectedAgent }: { preselectedAgent?: AgentConfig })
         return data.signedUrl
     }
     
-    const addToTranscript = (text: string, role: 'ai' | 'user') => {
+    const addToTranscript = (text: string, role: 'ai' | 'user', agentId?: string) => {
         setTranscript(prevTranscript => [...prevTranscript, {
             text,
             role,
             timestamp: new Date(),
+            agent_id: agentId
         }]);
     };
 
-    async function startConversation() {
+    async function startConversation(agent: AgentConfig) {
         const hasPermission = await requestMicrophonePermission();
         if (!hasPermission) {
             alert("No permission");
             return;
         }
 
-        const signedUrl = await getSignedUrl(selectedAgent.id)
+        const signedUrl = await getSignedUrl(agent.id);
         const conversation = await Conversation.startSession({
             signedUrl: signedUrl,
             onConnect: () => {
-                setIsConnected(true);
-                setIsSpeaking(true);
+                setActiveConversations(prev => ({
+                    ...prev,
+                    [agent.id]: {
+                        ...prev[agent.id],
+                        isConnected: true,
+                        isSpeaking: true
+                    }
+                }));
                 sendToMake();
             },
             onDisconnect: () => {
-                setIsConnected(false);
-                setIsSpeaking(false);
-                // Send conversation data to Make.com when session ends
+                setActiveConversations(prev => ({
+                    ...prev,
+                    [agent.id]: {
+                        ...prev[agent.id],
+                        isConnected: false,
+                        isSpeaking: false
+                    }
+                }));
                 sendToMake();
             },
             onError: (error) => {
                 console.log(error);
-                alert('An error occurred during the conversation');
+                alert(`An error occurred with ${agent.name}`);
             },
             onModeChange: ({mode}) => {
-                setIsSpeaking(mode === 'speaking');
+                setActiveConversations(prev => ({
+                    ...prev,
+                    [agent.id]: {
+                        ...prev[agent.id],
+                        isSpeaking: mode === 'speaking'
+                    }
+                }));
             },
             onMessage: (message) => {
                 if (message.message) {
-                    addToTranscript(message.message, message.source);
+                    addToTranscript(message.message, message.source, agent.id);
                 }
             },
         });
-        setConversation(conversation);
+
+        setActiveConversations(prev => ({
+            ...prev,
+            [agent.id]: {
+                conversation,
+                agentId: agent.id,
+                isConnected: false,
+                isSpeaking: false
+            }
+        }));
     }
 
-    async function endConversation() {
-        if (!conversation) {
-            return;
-        }
-        await conversation.endSession();
-        setConversation(null);
-        // Send conversation data to Make.com when manually ending
+    async function endConversation(agentId: string) {
+        const conv = activeConversations[agentId];
+        if (!conv) return;
+
+        await conv.conversation.endSession();
+        setActiveConversations(prev => {
+            const newState = { ...prev };
+            delete newState[agentId];
+            return newState;
+        });
         await sendToMake();
     }
 
@@ -169,85 +203,48 @@ export function ConvAI({ preselectedAgent }: { preselectedAgent?: AgentConfig })
         <div className="flex flex-col gap-8 w-full max-w-4xl mx-auto">
             <Card className="rounded-3xl">
                 <CardContent>
-                    <CardHeader>
-                        <CardTitle className="text-center">
-                            {isConnected ? (
-                                isSpeaking ? `Agent is speaking` : 'Agent is listening'
-                            ) : (
-                                'Disconnected'
-                            )}
-                        </CardTitle>
-                    </CardHeader>
-
-                    <div className={'flex flex-col gap-y-4 text-center'}>
-                        {!preselectedAgent && (
-                            <div className="grid grid-cols-5 gap-4 mb-8">
-                                {agents.map((agent) => (
-                                    <a
-                                        key={agent.id}
-                                        href={`/chat/${agent.name.toLowerCase().replace(/ /g, '-')}`}
-                                        className={cn(
-                                            'cursor-pointer p-2 rounded-lg transition-all no-underline',
-                                            'hover:bg-primary/5'
-                                        )}
-                                    >
-                                        <Image 
-                                            src={agent.avatar} 
-                                            alt={agent.name}
-                                            width={80}
-                                            height={80}
-                                            className={cn('w-20 h-20 rounded-full mx-auto mb-2 object-cover',
-                                                'border-4 border-gray-300'
-                                            )}
-                                        />
-                                        <p className="text-sm text-center font-medium">{agent.name}</p>
-                                        <p className="text-xs text-center text-muted-foreground">{agent.description}</p>
-                                    </a>
-                                ))}
-                            </div>
-                        )}
-                        {preselectedAgent && (
-                            <div className="mb-8">
+                    <div className="grid grid-cols-2 gap-8 mb-8">
+                        {selectedAgents.map((agent) => (
+                            <div key={agent.id} className="flex flex-col items-center">
                                 <Image 
-                                    src={selectedAgent.avatar} 
-                                    alt={selectedAgent.name}
+                                    src={agent.avatar} 
+                                    alt={agent.name}
                                     width={128}
                                     height={128}
                                     className={cn('w-32 h-32 rounded-full mx-auto mb-4 object-cover',
-                                        isSpeaking ? 'animate-pulse' : '',
-                                        isConnected ? 'border-4 border-green-500' : 'border-4 border-gray-300'
+                                        activeConversations[agent.id]?.isSpeaking ? 'animate-pulse' : '',
+                                        activeConversations[agent.id]?.isConnected ? 'border-4 border-green-500' : 'border-4 border-gray-300'
                                     )}
                                 />
-                                <p className="text-xl text-center font-medium">{selectedAgent.name}</p>
-                                <p className="text-sm text-center text-muted-foreground mt-2">{selectedAgent.description}</p>
+                                <p className="text-xl text-center font-medium">{agent.name}</p>
+                                <p className="text-sm text-center text-muted-foreground mt-2">{agent.description}</p>
+                                <div className="mt-4">
+                                    <Button
+                                        variant="outline"
+                                        className="rounded-full"
+                                        size="lg"
+                                        disabled={!!activeConversations[agent.id]}
+                                        onClick={() => startConversation(agent)}
+                                    >
+                                        Start conversation
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="rounded-full ml-2"
+                                        size="lg"
+                                        disabled={!activeConversations[agent.id]}
+                                        onClick={() => endConversation(agent.id)}
+                                    >
+                                        End conversation
+                                    </Button>
+                                </div>
                             </div>
-                        )}
-
-                        <div className="flex gap-4 justify-center">
-                            <Button
-                                variant="outline"
-                                className="rounded-full"
-                                size="lg"
-                                disabled={conversation !== null && isConnected}
-                                onClick={startConversation}
-                            >
-                                Start conversation
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="rounded-full"
-                                size="lg"
-                                disabled={conversation === null && !isConnected}
-                                onClick={endConversation}
-                            >
-                                End conversation
-                            </Button>
-                        </div>
+                        ))}
                     </div>
                 </CardContent>
             </Card>
 
-            {/* Transcript Display */}
+            {/* Modified Transcript Display */}
             <Card className="rounded-3xl">
                 <CardHeader>
                     <CardTitle>Conversation Transcript</CardTitle>
@@ -265,7 +262,10 @@ export function ConvAI({ preselectedAgent }: { preselectedAgent?: AgentConfig })
                                 )}
                             >
                                 <div className="font-semibold mb-1">
-                                    {entry.role === 'ai' ? 'Agent' : 'You'}
+                                    {entry.role === 'ai' 
+                                        ? selectedAgents.find(a => a.id === entry.agent_id)?.name || 'Agent'
+                                        : 'You'
+                                    }
                                 </div>
                                 <div>{entry.text}</div>
                                 <div className="text-xs text-gray-500 mt-1">
